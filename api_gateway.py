@@ -12,7 +12,7 @@ Usage:
     1. Configure your API keys and Moshi server address below
     2. Start the PersonaPlex/Moshi server on its default port (8998)
     3. Run this gateway:
-         uvicorn api_gateway:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ssl-certfile cert.pem
+         uvicorn personaplex_api_gateway:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ssl-certfile cert.pem
     4. Connect your clients to this gateway (port 8000) instead of Moshi directly
 
 Architecture:
@@ -333,9 +333,7 @@ async def offline_inference(
     request_id = str(uuid.uuid4())[:8]
     input_path = os.path.join(TEMP_DIR, f"{request_id}_input.wav")
     output_path = os.path.join(TEMP_DIR, f"{request_id}_output.wav")
-    
-    # Optional: If you want to capture stdout/stderr from the process
-    # transcript_path = os.path.join(TEMP_DIR, f"{request_id}_transcript.txt")
+    transcript_path = os.path.join(TEMP_DIR, f"{request_id}_transcript.txt")
 
     try:
         # Save uploaded audio
@@ -345,7 +343,6 @@ async def offline_inference(
         logger.info(f"[{request_id}] Received {len(content)} bytes of audio")
 
         # Run offline inference via the Moshi CLI
-        # NOTE: Ensure PERSONAPLEX_REPO is set correctly for your environment
         cmd = [
             "python", "-m", "moshi.offline",
             "--input", input_path,
@@ -362,7 +359,7 @@ async def offline_inference(
             cwd=PERSONAPLEX_REPO,
         )
         stdout, stderr = await asyncio.wait_for(
-            process.communicate(), timeout=300  # 5 min timeout for safety
+            process.communicate(), timeout=120  # 2 min timeout
         )
 
         if process.returncode != 0:
@@ -391,17 +388,10 @@ async def offline_inference(
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Inference timed out")
     finally:
-        # Cleanup input file
+        # Cleanup input file (output cleaned up after response is sent)
         if os.path.exists(input_path):
-            try:
-                os.remove(input_path)
-            except Exception as e:
-                logger.warning(f"Could not remove input file: {e}")
-        # Cleanup output file - handled by background task usually, but let's leave it for now
-        # or rely on temp directory cleaniup strategies. 
-        # Ideally, we stream the response and then delete, but FileResponse handles open files. 
-        # For simplicity in this script, we rely on OS or periodic cleanup for output files, 
-        # or implement BackgroundTasks in FastAPI to delete after response.
+            os.remove(input_path)
+
 
 # =============================================================================
 # ADMIN ENDPOINTS (Key Management)
@@ -454,6 +444,71 @@ async def revoke_api_key(api_key: str = Form(...)):
         return {"message": "Key revoked"}
     raise HTTPException(status_code=404, detail="Key not found")
 
+
+# =============================================================================
+# EXAMPLE CLIENT CODE (for reference)
+# =============================================================================
+"""
+--- WebSocket Client Example (Python) ---
+
+import asyncio
+import websockets
+
+API_KEY = "ppx-xxxxx"
+GATEWAY_URL = f"wss://your-server:8000/ws/stream?api_key={API_KEY}"
+
+async def stream_conversation():
+    async with websockets.connect(GATEWAY_URL) as ws:
+        # Send audio frames from microphone
+        # Receive audio frames for playback
+        
+        async def send_audio():
+            import sounddevice as sd
+            import numpy as np
+            stream = sd.InputStream(samplerate=24000, channels=1, dtype='int16')
+            stream.start()
+            while True:
+                audio_chunk, _ = stream.read(2400)  # 100ms chunks
+                await ws.send(audio_chunk.tobytes())
+                await asyncio.sleep(0.1)
+
+        async def receive_audio():
+            import sounddevice as sd
+            stream = sd.OutputStream(samplerate=24000, channels=1, dtype='int16')
+            stream.start()
+            async for msg in ws:
+                if isinstance(msg, bytes):
+                    audio = np.frombuffer(msg, dtype=np.int16)
+                    stream.write(audio)
+
+        await asyncio.gather(send_audio(), receive_audio())
+
+asyncio.run(stream_conversation())
+
+
+--- REST Client Example (Python) ---
+
+import requests
+
+API_KEY = "ppx-xxxxx"
+GATEWAY_URL = "https://your-server:8000/v1/inference"
+
+response = requests.post(
+    GATEWAY_URL,
+    headers={"X-API-Key": API_KEY},
+    files={"audio": open("question.wav", "rb")},
+    data={
+        "voice": "NATF2",
+        "persona": "You are a telephone operator at FAU. Your name is Alex. "
+                   "Help callers with directory information and transfers."
+    },
+)
+
+with open("response.wav", "wb") as f:
+    f.write(response.content)
+
+print(f"Transcript: {response.headers.get('X-Transcript', '')}")
+"""
 
 # =============================================================================
 # STARTUP

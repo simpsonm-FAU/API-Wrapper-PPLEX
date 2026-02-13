@@ -1,169 +1,120 @@
-# PersonalPlex API Gateway
+# 🎙️ PersonalPlex API Gateway
 
-An authenticated API gateway for the PersonalPlex/Moshi speech-to-speech model. This gateway provides API key management, rate limiting, and a RESTful endpoint for offline inference, alongside the real-time WebSocket proxy.
+<div align="center">
 
-## Features
+**Secure API Gateway for PersonaPlex/Moshi Speech-to-Speech Models**
 
-- **API Key Authentication**: Secure your Moshi instance with hashed API keys.
-- **Rate Limiting**: Prevent abuse with configurable rate limits per key.
-- **Offline Inference**: REST endpoint to process WAV files without real-time streaming constraints.
-- **WebSocket Proxy**: Full-duplex streaming support for real-time conversation.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.95+-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Moshi](https://img.shields.io/badge/Moshi-Backend-FF6F00.svg?style=flat-square)](https://github.com/kyutai-labs/moshi)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)]()
 
-## Requirements
+</div>
 
-- Python 3.8+
-- [Moshi](https://github.com/kyutai-labs/moshi) (or PersonalPlex fork)
-- Audio drivers (if running client locally)
+---
 
-## Installation
+## 📋 Overview
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/your-username/personalplex-gateway.git
-   cd personalplex-gateway
-   ```
+The **PersonalPlex API Gateway** serves as a secure entry point for your private speech-to-speech infrastructure. It sits between your client applications and the raw Moshi/PersonaPlex Model Server, adding essential enterprise features:
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- 🛡️ **API Key Authentication**: Secure your expensive GPU resources.
+- ⚡ **Rate Limiting**: Prevent abuse and manage load.
+- 📂 **Offline Inference**: Batch process audio files via REST API.
+- 🔄 **Real-Time Streaming**: Full-duplex WebSocket proxy for live conversations.
 
-## Offline Environment Setup
+## 🏗️ Architecture
 
-To run this gateway in an offline environment where you cannot access external PyPI repositories or Hugging Face, follow these steps:
+```mermaid
+graph LR
+    Client[📱 Client App/Script]
+    Gateway[🛡️ API Gateway :8000]
+    Moshi[🧠 Moshi Server :8998]
+    Auth[🔑 api_keys.json]
+    Disk[💾 File System]
 
-### 1. Pre-download Dependencies
-
-On an online machine, download the wheels for the requirements:
-
-```bash
-mkdir wheels
-pip download -r requirements.txt -d wheels
+    Client -- "WebSocket (Stream)" --> Gateway
+    Client -- "REST (Moshi CLI)" --> Gateway
+    Gateway -- "Validate Key" --> Auth
+    Gateway -- "Clean Audio Stream" --> Moshi
+    Gateway -- "Batch Process" --> Disk
+    Disk -.-> Moshi
+    Moshi -- "Generated Audio + Text" --> Gateway
+    Gateway -- "Response" --> Client
 ```
 
-Transfer the `wheels` directory to your offline machine and install:
+## ✨ Key Features
 
-```bash
-pip install --no-index --find-links=wheels -r requirements.txt
-```
+| Feature | Description |
+| :--- | :--- |
+| **🔐 Secure Access** | Validates `X-API-Key` headers or query parameters before allowing access. |
+| **🛑 Rate Limiting** | Configurable requests-per-minute (RPM) limits per API key. |
+| **🗣️ Real-Time** | Proxies WebSocket connections efficiently for low-latency streaming. |
+| **📥 Offline Mode** | Upload a WAV file, get a spoken response WAV file back (perfect for voicemail systems). |
 
-### 2. Set Up Moshi/PersonaPlex Locally
+## 🚀 Getting Started
 
-Ensure you have the Moshi or PersonalPlex repository cloned and installed on the offline machine.
+### Prerequisites
 
-1.  **Clone the Repo**:
+- **Python 3.8+**
+- **Moshi / PersonaPlex** installed and running on port `8998`.
+- [Optional] **FFmpeg** for audio processing.
+
+### Installation
+
+1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/kyutai-labs/moshi.git /opt/personaplex
-    cd /opt/personaplex
-    pip install .
+    git clone https://github.com/your-username/API-Wrapper-PPLEX.git
+    cd API-Wrapper-PPLEX
     ```
 
-2.  **Download Model Weights**:
-    You will need the model weights (e.g., `moshiko-pytorch-bf16`). Download them from Hugging Face on an online machine and transfer them to a local directory on the offline machine (e.g., `/opt/models/moshi`).
+2.  **Install Dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
+    *Note: `requirements.txt` should include: `fastapi`, `uvicorn`, `websockets`, `python-multipart`, `aiofiles`.*
 
-### 3. Configuration
+3.  **Configure Environment (Optional)**
+    Create a `.env` file or set environment variables:
+    ```bash
+    export MOSHI_HOST="localhost"
+    export MOSHI_PORT="8998"
+    export RATE_LIMIT_RPM="60"
+    export PERSONAPLEX_REPO="/path/to/moshi/repo"
+    ```
 
-You can configure the gateway using environment variables. Create a `.env` file or export them in your shell.
+## 🛠️ Usage
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `MOSHI_HOST` | Hostname of the Moshi server | `localhost` |
-| `MOSHI_PORT` | Port of the Moshi server | `8998` |
-| `PERSONAPLEX_REPO` | **Critical for Offline**: Path to the local Moshi repo | `/opt/personaplex` |
-| `API_KEYS_FILE` | Path to store API keys | `api_keys.json` |
-| `ADMIN_SECRET` | Secret for admin endpoints | `change-me-in-production` |
-
-**Example Command (Offline Mode):**
-
+### 1. Start the Server
 ```bash
-# Set the path where you cloned Moshi/PersonaPlex
-export PERSONAPLEX_REPO="C:/Authentication/personaplex"
-
-# Start the Gateway
 uvicorn api_gateway:app --host 0.0.0.0 --port 8000
 ```
+*On first launch, it will generate a default **Admin API Key** and print it to the console. Save this key!*
 
-## Usage
-
-### 1. Generating an API Key
-
-On first run, the server will log a default admin key. Use this key to generate persistent keys via the API.
-
+### 2. Generate Client Keys
+Use your admin key to create keys for your apps:
 ```bash
 curl -X POST http://localhost:8000/admin/keys/generate \
-  -H "X-Admin-Secret: change-me-in-production" \
-  -F "name=my-app"
+  -H "X-Admin-Secret: YOUR_ADMIN_SECRET" \
+  -F "name=my-mobile-app"
 ```
 
-### 2. Real-time Streaming (WebSocket)
+### 3. Connect Clients
 
-Connect to: `ws://localhost:8000/ws/stream?api_key=YOUR_KEY`
+#### 🌊 Real-Time WebSocket
+Connect to `wss://your-server:8000/ws/stream?api_key=CLIENT_KEY`.
+- **Send**: Raw audio bytes (24kHz PCM).
+- **Receive**: Raw audio bytes + Text transcripts.
 
-### 3. Offline Inference (REST)
-
-Send a WAV file to be processed:
-
+#### 📁 Offline Inference (REST)
+Send a file to get a file back:
 ```bash
 curl -X POST http://localhost:8000/v1/inference \
-  -H "X-API-Key: YOUR_KEY" \
+  -H "X-API-Key: CLIENT_KEY" \
   -F "audio=@input.wav" \
-  -F "voice=NATF2" \
-  -F "persona=You are a helpful assistant." \
+  -F "persona=You are a sarcastic robot." \
   --output response.wav
 ```
 
-## Running the Moshi Backend
+## 📜 License
 
-Ensure the Moshi server is running separately if you are using the WebSocket features:
-```bash
-python -m moshi.server --port 8998
-```
-
-## Running as a Service
-
-To ensure the gateway runs automatically on boot and restarts on failure, set it up as a system service.
-
-### Linux (systemd)
-
-1.  Create a service file at `/etc/systemd/system/personaplex-gateway.service`:
-
-    ```ini
-    [Unit]
-    Description=PersonaPlex API Gateway
-    After=network.target
-
-    [Service]
-    User=your-user
-    Group=your-group
-    WorkingDirectory=/opt/personalplex-gateway
-    Environment="PATH=/opt/personalplex-gateway/venv/bin:/usr/local/bin:/usr/bin"
-    Environment="MOSHI_HOST=localhost"
-    Environment="PERSONAPLEX_REPO=/opt/personaplex"
-    ExecStart=/opt/personalplex-gateway/venv/bin/uvicorn api_gateway:app --host 0.0.0.0 --port 8000
-    Restart=always
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-
-2.  Enable and start the service:
-
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable personaplex-gateway
-    sudo systemctl start personaplex-gateway
-    ```
-
-### Windows (NSSM)
-
-For Windows servers, use [NSSM (Non-Sucking Service Manager)](https://nssm.cc/):
-
-1.  Download NSSM and extract it.
-2.  Open a terminal as Administrator.
-3.  Run: `nssm install PersonaplexGateway`
-4.  In the GUI:
-    -   **Path**: Path to your `python.exe` (or venv python).
-    -   **Startup directory**: `C:\path\to\personalplex-gateway`
-    -   **Arguments**: `-m uvicorn api_gateway:app --host 0.0.0.0 --port 8000`
-5.  Click **Install service**.
-6.  Start it: `nssm start PersonaplexGateway`
+This project is open-source and available under the [MIT License](LICENSE).
