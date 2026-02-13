@@ -82,36 +82,47 @@ graph LR
     export PERSONAPLEX_REPO="/path/to/moshi/repo"
     ```
 
-## 🛠️ Usage
+## 🔑 Team Onboarding & Key Management
 
-### 1. Start the Server
-```bash
-uvicorn api_gateway:app --host 0.0.0.0 --port 8000
-```
-*On first launch, it will generate a default **Admin API Key** and print it to the console. Save this key!*
+### 1. The Admin Secret (Master Password)
+The `admin_secret` is your "master key" for the gateway. It allows you to generate and revoke access for others.
+*   **Default**: `change-me-in-production`
+*   **Production**: Set this via the `ADMIN_SECRET` environment variable.
 
-### 2. Generate Client Keys
-Use your admin key to create keys for your apps:
+### 2. Generating Keys for Your Team
+As an administrator, you will generate unique API keys for each developer or application (e.g., "Mobile App v1", "Dev Team - Mike").
+
+**Command:**
 ```bash
 curl -X POST http://localhost:8000/admin/keys/generate \
   -H "X-Admin-Secret: YOUR_ADMIN_SECRET" \
-  -F "name=my-mobile-app"
+  -F "name=Frontend Team" \
+  -F "description=Key for the main web interface"
 ```
 
-### 3. Connect Clients
+**Response:**
+```json
+{
+  "api_key": "ppx-a1b2c3d4...", 
+  "name": "Frontend Team",
+  "message": "Store this key securely — it cannot be retrieved again."
+}
+```
+*⚠️  Share the `api_key` with your team member via a secure channel (e.g., 1Password). They will use this key for all their requests.*
+
+### 3. Using the API (For Developers)
 
 #### 🌊 Real-Time WebSocket
-Connect to `wss://your-server:8000/ws/stream?api_key=CLIENT_KEY`.
-- **Send**: Raw audio bytes (24kHz PCM).
-- **Receive**: Raw audio bytes + Text transcripts.
+Connect to the stream using your provided `api_key`:
+`wss://your-server:8000/ws/stream?api_key=ppx-a1b2c3d4...`
 
 #### 📁 Offline Inference (REST)
-Send a file to get a file back:
+Submit audio files for processing:
 ```bash
 curl -X POST http://localhost:8000/v1/inference \
-  -H "X-API-Key: CLIENT_KEY" \
+  -H "X-API-Key: ppx-a1b2c3d4..." \
   -F "audio=@input.wav" \
-  -F "persona=You are a sarcastic robot." \
+  -F "persona=You are a helpful assistant." \
   --output response.wav
 ```
 

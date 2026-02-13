@@ -1,0 +1,168 @@
+{
+    "info": {
+        "_postman_id": "b591-24eb7a619dc0",
+        "name": "PersonaPlex Gateway",
+        "description": "Collection for testing the PersonalPlex API Gateway endpoints.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{base_url}}/health",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "health"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Admin: List Keys",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "X-Admin-Secret",
+                        "value": "{{admin_secret}}",
+                        "type": "text"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/admin/keys",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "admin",
+                        "keys"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Admin: Generate Key",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "var jsonData = pm.response.json();",
+                            "if (jsonData.api_key) {",
+                            "    pm.collectionVariables.set(\"api_key\", jsonData.api_key);",
+                            "    console.log(\"API Key set to collection variables\");",
+                            "}"
+                        ],
+                        "type": "text/javascript"
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "X-Admin-Secret",
+                        "value": "{{admin_secret}}",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                        {
+                            "key": "name",
+                            "value": "Postman Test Key",
+                            "type": "text"
+                        },
+                        {
+                            "key": "description",
+                            "value": "Generated via Postman",
+                            "type": "text"
+                        }
+                    ]
+                },
+                "url": {
+                    "raw": "{{base_url}}/admin/keys/generate",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "admin",
+                        "keys",
+                        "generate"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Inference (Offline)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "X-API-Key",
+                        "value": "{{api_key}}",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "formdata",
+                    "formdata": [
+                        {
+                            "key": "voice",
+                            "value": "NATF2",
+                            "type": "text"
+                        },
+                        {
+                            "key": "persona",
+                            "value": "You are a helpful assistant.",
+                            "type": "text"
+                        },
+                        {
+                            "key": "audio",
+                            "type": "file",
+                            "src": []
+                        }
+                    ]
+                },
+                "url": {
+                    "raw": "{{base_url}}/v1/inference",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "v1",
+                        "inference"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ],
+    "event": [],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "admin_secret",
+            "value": "change-me-in-production",
+            "type": "string"
+        },
+        {
+            "key": "api_key",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}
